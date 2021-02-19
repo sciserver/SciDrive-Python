@@ -6,8 +6,10 @@ import urllib
 
 from io import StringIO
 from io import BytesIO
-
-from SciServer import Authentication, Config
+from astropy.io import fits
+from py3.SciServer import Authentication, Config
+from py3.SciServer import CasJobs
+from urllib.parse import urlparse
 
 def sqlSearch(sql, dataRelease=None):
     """
@@ -339,3 +341,28 @@ def objectSearch(objId=None, specObjId=None, apogee_id=None, apstar_id=None, ra=
     #r = json.loads(response.content.decode())
     #return pandas.read_csv(StringIO(r), comment='#')
     return r;
+
+    # TODO: get a list of FITS path given a list of object ID and
+    # TODO: make a new function that return a hdu object from FITS file after solve the fits.open() warning problem
+#1: use casjobs to query for the specobjid by the coordinate
+#2: use dr7.fgeturlfitsspectrum(specobjid) to have the http url:
+# like this http://das.sdss.org/spectro/1d_26/1472/1d/spSpec-52913-1472-269.fit
+# then append sdss_das/das2/ in the front
+
+
+def getSpecObjID(ra, dec, width, height, context=None, URL=True):
+    leftBoundry = ra - width / 2
+    rightBoundry = ra + width / 2
+    upperBoundry = dec + height / 2
+    lowerBoundry = dec - height / 2
+    sqlQuery = 'select specObjID from dr7.specobjall Where (ra >' + str(leftBoundry) + ' and ra<' + str(
+        rightBoundry) + ') and (dec>' + str(lowerBoundry) + ' and dec<' + str(upperBoundry) + ')'
+    return CasJobs.executeQuery(sqlQuery, context='dr7', format='pandas')
+def getRawFITSPathInDAS(SpecObjID):
+    sqlQuery = 'select dr7.fGetUrlFitsSpectrum('+SpecObjID+')'
+    response = CasJobs.executeQuery(sqlQuery, context='dr7', format='pandas')
+    url= response['Column1'][0]
+    parseResult = urlparse(url)
+    prefix = '/home/idies/workspace/sdss_das/das2'
+    path = prefix+parseResult.path
+    return path
